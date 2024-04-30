@@ -1,0 +1,16 @@
+esphome:
+  name: "reflash-me"
+  friendly_name: "Reflash Me!"
+  name_add_mac_suffix: true
+
+api:
+ota:
+logger:
+  baud_rate: 0
+  level: NONE
+wifi:
+  ap: {}
+  domain: .local
+captive_portal:
+web_server:
+  port: 80
