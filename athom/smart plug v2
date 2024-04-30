@@ -26,7 +26,7 @@ esphome:
   name: "${name}"
   friendly_name: "${friendly_name}"
   area: "${room}"
-  name_add_mac_suffix: true
+  name_add_mac_suffix: false
   min_version: 2024.2.1
   project:
     name: "${project_name}"
@@ -44,7 +44,8 @@ preferences:
 
 api:
   encryption: 
-    key: {your_super_secure_key_here} # EPSHome & HA seem to whinge if there is no encryption.
+    ## EPSHome & HA seem to whinge if there is no encryption.
+    key: {your_super_secure_key_here} 
 ota:
 
 logger:
@@ -54,7 +55,8 @@ web_server:
   port: 80
 
 wifi:
-  ap: {} # This spawns an AP with the device name and mac address with no password.
+  ## This spawns an AP with the device name and mac address with no password.
+  ap: {} 
   fast_connect: "${wifi_fast_connect}"
   domain: "${dns_domain}"
 
@@ -143,7 +145,8 @@ sensor:
       id: power_sensor
       filters:
         - throttle_average: ${sensor_update_interval}
-        - lambda: if (x < 3.0) return 0.0; else return x;    #For the chip will report less than 3w power when no load is connected
+        ## For the chip will report less than 3w power when no load is connected
+        - lambda: if (x < 3.0) return 0.0; else return x;    
 
     energy:
       name: "Energy"
@@ -151,7 +154,7 @@ sensor:
       unit_of_measurement: kWh
       filters:
         - throttle: ${sensor_update_interval}
-        # Multiplication factor from W to kW is 0.001
+        ## Multiplication factor from W to kW is 0.001
         - multiply: 0.001
       on_value:
         then:
