@@ -384,7 +384,7 @@ display:
         lambda: |-
           it.printf(0, 0, id(open_sans_14), "ID:");
           it.printf(128, 0, id(open_sans_14), TextAlign::TOP_RIGHT, "%s", get_mac_address().c_str());
-          it.printf(0, 21, id(open_sans_14), "Config Ver: $config_version");
+          it.printf(0, 21, id(open_sans_14), "Config Ver: $project_version");
           it.printf(0, 42, id(open_sans_14), "$friendly_name");
 
     on_page_change:
@@ -393,7 +393,7 @@ display:
         - if:
             # Skip the boot page after initial boot
             condition:
-                lambda: 'return id(device_uptime).state > 30;'
+                lambda: 'return id(uptime_sensor).state > 30;'
             then:
               - display.page.show_next: oled_display
               - component.update: oled_display
@@ -432,7 +432,7 @@ interval:
       - if:
           # Show boot screen for first 10 seconds with serial number and config version
           condition:
-              lambda: 'return id(device_uptime).state < 10;'
+              lambda: 'return id(uptime_sensor).state < 10;'
           then:
             - display.page.show: boot
           else:
