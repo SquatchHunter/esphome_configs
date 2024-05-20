@@ -1,0 +1,455 @@
+## Formatting Notice, I have used 2 hashtags/pound signs on all original comments + additional I added, single comments on values that have been disabled in this config.
+## This config is based on MallocArray's ESPHome config for the AG One - https://github.com/MallocArray/airgradient_esphome/blob/main/airgradient-one.yaml
+
+substitutions:
+  ## Avoid underscores, since ESPHome uses mDNS, underscores can be funny with mDNS and there is no inbuilt sanitiser.
+  name: "ag-one"
+  friendly_name: "AirGradient One"
+  room: ""
+  device_description: "AirGradient Air Monitor with OLED Display & LEDs" 
+  project_name: "AirGradient.AG One"
+  project_version: "2.0.5" 
+  ## Define a domain for this device to use. i.e. iot.home.lan (so device will appear as device.iot.home.lan in DNS/DHCP logs)
+  dns_domain: ".local"
+  ## Set timezone of the device. Can be entered in unix Country/Area format (i.e. "Australia/Sydney")
+  timezone: "Australia/Sydney"
+  ## Enables faster network connections, with last connected SSID being connected to and no full scan for SSID being undertaken
+  wifi_fast_connect: "false"
+  
+  ## Offset for SenseAir C02 Sensor
+  co2_offset: '0'
+  ## Time the PMS500x spends idle/off to preserve the laser - https://esphome.io/components/sensor/pmsx003.html
+  pm_update_interval: "2min"
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  area: "${room}"
+  name_add_mac_suffix: false
+  min_version: 2024.2.1
+  project:
+    name: "${project_name}"
+    version: "${project_version}"
+
+esp32:
+  board: esp32-c3-devkitm-1
+
+preferences:
+  ## Malloc doesnt set this and uses the default, we will be increasing the interval to preserve flash
+  flash_write_interval: 15min
+
+api:
+  encryption: 
+    ## EPSHome & HA seem to whinge if there is no encryption.
+    key: {your_super_secure_key_here} 
+ota:
+
+logger:
+  baud_rate: 0
+
+## Webservers are cool and useful for checking values directly coming out of the device + giving a nice "is it working" sanity check
+## but the package is also really f a t so we opt to not use it.
+# web_server:
+#   port: 80
+
+wifi:
+  ## This spawns an AP with the device name and mac address with no password.
+  ap: {} 
+  fast_connect: "${wifi_fast_connect}"
+  domain: "${dns_domain}"
+captive_portal:
+
+uart:
+  # https://esphome.io/components/uart.html#uart
+  - rx_pin: GPIO0  # Pin 12
+    tx_pin: GPIO1  # Pin 13
+    baud_rate: 9600
+    id: senseair_s8_uart
+
+  - rx_pin: GPIO20  # Pin 30 or RX
+    tx_pin: GPIO21  # Pin 31 or TX
+    baud_rate: 9600
+    id: pms5003_uart
+
+i2c:
+  # https://esphome.io/components/i2c.html
+  sda: GPIO7 # Pin 21
+  scl: GPIO6 # Pin 20
+  frequency: 400kHz  # 400kHz eliminates warnings about components taking a long time other than SGP40 component: https://github.com/esphome/issues/issues/4717
+
+sensor:
+  - platform: pmsx003
+    # PMS5003 https://esphome.io/components/sensor/pmsx003.html
+    type: PMSX003
+    uart_id: pms5003_uart
+    pm_2_5:
+      name: "PM 2.5"
+      id: pm_2_5
+      device_class: pm25  # Added to report properly to HomeKit
+    pm_1_0:
+      name: "PM 1.0"
+      id: pm_1_0
+      device_class: pm1  # Added to report properly to HomeKit
+    pm_10_0:
+      name: "PM 10.0"
+      id: pm_10_0
+      device_class: pm10  # Added to report properly to HomeKit
+    pm_0_3um:
+      name: "PM 0.3"
+      id: pm_0_3um
+    update_interval: $pm_update_interval
+
+  - platform: template
+    # Depends on another sensor providing an ID of pm_2_5 such as a pms5003
+    name: "PM 2.5 AQI"
+    id: pm_2_5_aqi
+    update_interval: 5 min
+    unit_of_measurement: "AQI"
+    icon: "mdi:air-filter"
+    accuracy_decimals: 0
+    filters:
+      - skip_initial: 1  # Need valid data from PM 2.5 sensor before able to calculate
+    lambda: |-
+      // https://en.wikipedia.org/wiki/Air_quality_index#Computing_the_AQI
+      // Borrowed from https://github.com/kylemanna/sniffer/blob/master/esphome/sniffer_common.yaml
+      if (id(pm_2_5).state <= 12.0) {
+      // good
+      return((50.0 - 0.0) / (12.0 - 0.0) * (id(pm_2_5).state - 0.0) + 0.0);
+      } else if (id(pm_2_5).state <= 35.4) {
+      // moderate
+      return((100.0 - 51.0) / (35.4 - 12.1) * (id(pm_2_5).state - 12.1) + 51.0);
+      } else if (id(pm_2_5).state <= 55.4) {
+      // usg
+      return((150.0 - 101.0) / (55.4 - 35.5) * (id(pm_2_5).state - 35.5) + 101.0);
+      } else if (id(pm_2_5).state <= 150.4) {
+      // unhealthy
+      return((200.0 - 151.0) / (150.4 - 55.5) * (id(pm_2_5).state - 55.5) + 151.0);
+      } else if (id(pm_2_5).state <= 250.4) {
+      // very unhealthy
+      return((300.0 - 201.0) / (250.4 - 150.5) * (id(pm_2_5).state - 150.5) + 201.0);
+      } else if (id(pm_2_5).state <= 350.4) {
+      // hazardous
+      return((400.0 - 301.0) / (350.4 - 250.5) * (id(pm_2_5).state - 250.5) + 301.0);
+      } else if (id(pm_2_5).state <= 500.4) {
+      // hazardous 2
+      return((500.0 - 401.0) / (500.4 - 350.5) * (id(pm_2_5).state - 350.5) + 401.0);
+      } else {
+      return(500);
+      }
+
+  - platform: senseair
+    # SenseAir S8 https://esphome.io/components/sensor/senseair.html
+    # https://senseair.com/products/size-counts/s8-lp/
+    # https://climate.nasa.gov/vital-signs/carbon-dioxide/?intent=121
+    # https://senseair.com/the-senseair-abc-algorithm/
+    co2:
+      name: "CO2"
+      id: co2
+      filters:
+        - offset: $co2_offset
+    id: senseair_s8
+    uart_id: senseair_s8_uart
+
+  - platform: sht4x
+    # SHT40 https://esphome.io/components/sensor/sht4x.html
+    temperature:
+      name: "Temperature"
+      id: temp
+    humidity:
+      name: "Humidity"
+      id: humidity
+    address: 0x44
+
+  - platform: sgp4x
+    # SGP41 https://esphome.io/components/sensor/sgp4x.html
+    voc:
+      name: "VOC Index"
+      id: voc
+    nox:
+      name: "NOx Index"
+      id: nox
+    compensation:  # Remove this block if no temp/humidity sensor present for compensation
+      temperature_source: temp
+      humidity_source: humidity
+
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: uptime
+    name: "Uptime Sensor"
+    id: uptime_sensor
+    ## Mark this verison of the uptime sensor as internal as we are going to use a text sensor later to show uptime in human readable format.
+    internal: true 
+
+binary_sensor:
+  - platform: status
+    name: "Status"
+    entity_category: diagnostic
+
+  - platform: gpio
+    # Binary sensor to perform action when physical config button is pressed
+    # https://esphome.io/components/binary_sensor/index.html?highlight=on_multi_click
+    pin:
+      number: GPIO9
+      mode: INPUT_PULLUP
+      inverted: true
+      ignore_strapping_warning: true
+    internal: true  # Hide from displaying in HomeAssistant
+    name: "Configuration Button"
+    id: config_button
+    on_multi_click:
+      - timing:  # Short Click
+          - ON for at most 1s
+          - OFF for at least 0.5s
+        then:
+          - logger.log: "Toggling display betwen C and F"
+          - switch.toggle: display_in_f
+      - timing:  # Press and hold up to 5 seconds
+          - ON for 1s to 5s
+          - OFF for at least 0.5s
+        then:
+          - logger.log: "Starting manual CO2 calibration"
+          - senseair.background_calibration: senseair_s8
+          - delay: 70s
+          - senseair.background_calibration_result: senseair_s8
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+      entity_category: diagnostic
+    ssid:
+      name: "Connected SSID"
+      entity_category: diagnostic
+    mac_address:
+      name: "Mac Address"
+      entity_category: diagnostic
+
+  - platform: template
+    name: "Uptime"
+    entity_category: diagnostic
+    lambda: |-
+      int seconds = (id(uptime_sensor).state);
+      int days = seconds / (24 * 3600);
+      seconds = seconds % (24 * 3600);
+      int hours = seconds / 3600;
+      seconds = seconds % 3600;
+      int minutes = seconds /  60;
+      seconds = seconds % 60;
+      if ( days > 3650 ) {
+        return { "Starting up" };
+      } else if ( days ) {
+        return { (String(days) +"d " + String(hours) +"h " + String(minutes) +"m "+ String(seconds) +"s").c_str() };
+      } else if ( hours ) {
+        return { (String(hours) +"h " + String(minutes) +"m "+ String(seconds) +"s").c_str() };
+      } else if ( minutes ) {
+        return { (String(minutes) +"m "+ String(seconds) +"s").c_str() };
+      } else {
+        return { (String(seconds) +"s").c_str() };
+      }
+    icon: mdi:clock-start
+
+button:
+  # https://github.com/esphome/issues/issues/2444
+  - platform: template
+    name: SenseAir S8 Calibration
+    id: senseair_s8_calibrate_button
+    on_press:
+      then:
+        - senseair.background_calibration: senseair_s8
+        - delay: 70s
+        - senseair.background_calibration_result: senseair_s8
+
+  - platform: template
+    # Displays the current ABC interval in the ESPhome logs to verify status
+    name: SenseAir S8 Show Calibration Interval
+    id: senseair_s8_show_calibrate_interval
+    on_press:
+      then:
+        - senseair.abc_get_period: senseair_s8
+  ## Add generic buttons.
+  - platform: restart
+    name: "Restart"
+    entity_category: config
+  - platform: factory_reset
+    name: "Factory Reset"
+    id: Reset
+    entity_category: config
+  - platform: safe_mode
+    # Create a switch for safe_mode in order to flash the device
+    # Solution from this thread:
+    # https://community.home-assistant.io/t/esphome-flashing-over-wifi-does-not-work/357352/1
+    name: "Safe Mode"
+    internal: false
+    entity_category: config
+
+switch:
+  - platform: template
+    name: SenseAir S8 Automatic Baseline Correction
+    id: senseair_s8_abc_switch
+    restore_mode: RESTORE_DEFAULT_ON
+    optimistic: True
+    entity_category: config
+    turn_on_action:
+      - senseair.abc_enable: senseair_s8
+    turn_off_action:
+      - senseair.abc_disable: senseair_s8
+
+  - platform: template
+    name: "Display Temperature in °F"
+    icon: "mdi:thermometer"
+    id: display_in_f
+    restore_mode: RESTORE_DEFAULT_ON
+    optimistic: True
+
+number:
+  - platform: template
+    # https://esphome.io/components/number/template.html
+    name: "Display Contrast %"
+    icon: "mdi:lightbulb"
+    id: display_contrast
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 100
+    optimistic: true
+    restore_value: true
+    mode: slider
+    on_value:
+      then:
+        # https://www.reddit.com/r/Esphome/comments/sy1d1s/how_to_write_a_lamba_to_change_the_contrast_of/
+        lambda: id(oled_display).set_contrast(id(display_contrast).state / 100.0);
+
+  - platform: template
+    # https://esphome.io/components/number/template.html
+    name: "LED Brightness %"
+    icon: "mdi:lightbulb"
+    id: led_brightness
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 100
+    optimistic: true
+    restore_value: true
+    mode: slider
+
+  - platform: template
+    # https://esphome.io/components/number/template.html
+    name: "LED Fade %"
+    icon: "mdi:lightbulb"
+    id: led_fade
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 20
+    optimistic: true
+    restore_value: true
+    mode: box
+
+display:
+  - platform: ssd1306_i2c
+    # https://esphome.io/components/display/ssd1306.html
+    # Formatting reference: https://www.tutorialspoint.com/c_standard_library/c_function_printf.htm
+    model: "SH1106 128x64"
+    id: oled_display
+    address: 0x3C
+    # rotation: 180°
+    pages:
+      - id: summary
+        # https://forum.airgradient.com/t/airgradient-one-customized-mallocarray-esphome-display/1328
+        lambda: |-
+          if (id(display_in_f).state) {
+            it.printf(0, 0, id(open_sans_14), "%.1f°F", id(temp).state*9/5+32);
+          } else {
+            it.printf(0, 0, id(open_sans_14), "%.1f°C", id(temp).state);
+          }
+          it.printf(128, 0, id(open_sans_14), TextAlign::TOP_RIGHT, "%.1f%%", id(humidity).state);
+          it.line(0,17,128,17);
+          it.printf(0,19, id(open_sans_9), "CO2");
+          it.printf(0,27, id(open_sans_20), "%.0f", id(co2).state);
+          it.printf(0,52, id(open_sans_9), "ppm");
+          it.line(50,19,50,64);
+          it.printf(54, 19, id(open_sans_9), "PM2.5");
+          it.printf(54, 27, id(open_sans_20), "%.0f", id(pm_2_5).state);
+          it.printf(54, 52, id(open_sans_9), "µg/m³");
+          it.line(100,19,100,64);
+          it.printf(104,18, id(open_sans_9), "TVOC");
+          it.printf(104,29, id(open_sans_9), "%.0f", id(voc).state);
+          it.printf(104,41, id(open_sans_9), "NOx");
+          it.printf(104,52, id(open_sans_9), "%.0f", id(nox).state);
+      - id: boot
+        lambda: |-
+          it.printf(0, 0, id(open_sans_14), "ID:");
+          it.printf(128, 0, id(open_sans_14), TextAlign::TOP_RIGHT, "%s", get_mac_address().c_str());
+          it.printf(0, 21, id(open_sans_14), "Config Ver: $config_version");
+          it.printf(0, 42, id(open_sans_14), "$friendly_name");
+
+    on_page_change:
+      to: boot
+      then:
+        - if:
+            # Skip the boot page after initial boot
+            condition:
+                lambda: 'return id(device_uptime).state > 30;'
+            then:
+              - display.page.show_next: oled_display
+              - component.update: oled_display
+
+light:
+    # https://esphome.io/components/light/esp32_rmt_led_strip.html
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO10  # Pin 16
+    num_leds: 11
+    rmt_channel: 0
+    chipset: ws2812
+    name: "LED Strip"
+    id: led_strip
+    restore_mode: RESTORE_DEFAULT_OFF
+
+output:
+  - platform: gpio
+    # Pin to notify external watchdog that activity is present
+    id: watchdog
+    pin:
+      number: GPIO2
+      ignore_strapping_warning: true  # Acknowledging that this is a strapping pin and should not have external pullup/down resistors  https://esphome.io/guides/faq.html#why-am-i-getting-a-warning-about-strapping-pins
+
+interval:
+  - interval: 2.5min
+    # Notify watchdog device it is still alive
+    then:
+      - output.turn_on: watchdog
+      - delay: 20ms
+      - output.turn_off: watchdog
+      
+  - interval: 5s
+    # Automatically switch to the next page every five seconds
+    then:
+      - if:
+          # Show boot screen for first 10 seconds with serial number and config version
+          condition:
+              lambda: 'return id(device_uptime).state < 10;'
+          then:
+            - display.page.show: boot
+          else:
+            # Change page on display
+            - display.page.show_next: oled_display
+            - component.update: oled_display
+
+font:
+  - file: "gfonts://Open Sans"
+    id: open_sans_14
+    size: 14
+    glyphs: '!"%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz/µ³'
+  - file: "gfonts://Open Sans"
+    id: open_sans_9
+    size: 9
+    glyphs: '!"%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz/µ³'
+  - file: "gfonts://Open Sans"
+    id: open_sans_20
+    size: 20
+    glyphs: '!"%()+=,-_.:°0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz/µ³'
