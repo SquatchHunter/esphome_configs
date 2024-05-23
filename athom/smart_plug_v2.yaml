@@ -186,7 +186,9 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     name: "Power Button"
-    disabled_by_default: true
+    # disabled_by_default: true
+    ## make power button internal as it is not needed in the slightest in frontend
+    internal: true
     on_multi_click:
       - timing:
         - ON for at most 1s
