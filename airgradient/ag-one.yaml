@@ -247,7 +247,7 @@ text_sensor:
       int hours = temp / 3600;
       temp = temp % 3600;
       int minutes = temp /  60;
-      seconds = temp % 60;
+      int seconds = temp % 60;
       if ( seconds < 30 ) {
         return { "Starting Up..." };
       } else if ( days ) {
