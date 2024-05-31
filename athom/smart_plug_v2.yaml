@@ -11,13 +11,13 @@ substitutions:
   device_description: "Athom Smart Plug V2 with Energy Monitoring" 
   project_name: "Athom Technology.Smart Plug V2"
   ## Version Bump cause why not.
-  project_version: "2.0.4" 
+  project_version: "2.1.1" 
   relay_restore_mode: RESTORE_DEFAULT_OFF
-  ## Decrease the rate at which the cse7766 updates as it can be spammy
+  ## Dictate the "throttle" at which the CSE7766 chip posts updates to ESPHome/Home Assistant
   sensor_update_interval: 30s
   ## Current Limit in Amps. AU Plug = 10. IL, BR, EU, UK, US Plug = 16.
   current_limit : "10"
-  ## Define a domain for this device to use. i.e. iot.home.lan (so device will appear as athom-smart-plug-v2.iot.home.lan in DNS/DHCP logs)
+  ## Define a domain for this device to use. i.e. .local (so device will appear as athom-smart-plug-v2.local in DNS/DHCP logs)
   dns_domain: ".local"
   ## Set timezone of the smart plug. Useful if the plug is in a location different to the HA server. Can be entered in unix Country/Area format (i.e. "Australia/Sydney")
   timezone: "Australia/Sydney"
@@ -134,7 +134,7 @@ sensor:
     unit_of_measurement: kWh
     device_class: "energy"
     state_class: "total_increasing"
-    icon: "mdi:lightning-bolt"
+    icon: "mdi:trending-up"
     accuracy_decimals: 3
     lambda: |-
       return id(total_energy);
@@ -204,22 +204,25 @@ text_sensor:
   - platform: wifi_info
     ip_address:
       name: "IP Address"
+      icon: "mdi:ip"
       entity_category: diagnostic
     ssid:
       name: "Connected SSID"
+      icon: "mdi:network"
       entity_category: diagnostic
     mac_address:
       name: "Mac Address"
       entity_category: diagnostic
 
   ## Creates a sensor showing when the device was last restarted
-  - platform: template
-    name: 'Last Restart'
-    id: device_last_restart
-    icon: mdi:clock
-    entity_category: diagnostic
+  ## Generally, the power plugs do not restart so this is a overkill sensor
+  # - platform: template
+  #   name: 'Last Restart'
+  #   id: device_last_restart
+  #   icon: mdi:clock
+  #   entity_category: diagnostic
 
-  ## Creates a sensor of the uptime of the device, in formatted days, hours, minutes and seconds
+  ## Creates a sensor of the uptime of the device, formatted in days, hours, minutes and seconds
   - platform: template
     name: "Uptime"
     entity_category: diagnostic
@@ -267,6 +270,7 @@ switch:
     restore_mode: ${relay_restore_mode}
 
 light:
+  ## https://esphome.io/components/light/
   - platform: status_led
     name: "Status LED"
     id: blue_led
@@ -277,21 +281,31 @@ light:
       inverted: true
       number: GPIO13
 
+# time:
+#  - platform: sntp
+#    id: sntp_time
+#    ## Define the timezone of the device
+#    timezone: "${timezone}"
+#    ## Change sync interval from default 5min to 6 hours
+#    update_interval: 360min    
+#    ## Publish the time the device was last restarted
+#    on_time_sync:
+#      then:
+#        ## Update last restart time, but only once.
+#        - if:
+#            condition:
+#              lambda: 'return id(device_last_restart).state == "";'
+#            then:
+#              - text_sensor.template.publish:
+#                  id: device_last_restart
+#                  state: !lambda 'return id(sntp_time).now().strftime("%a %d %b %Y - %I:%M:%S %p");'
+
 time:
-  - platform: sntp
-    id: sntp_time
+  ## https://esphome.io/components/time/homeassistant
+  ## required for total_daily_energy
+  - platform: homeassistant
+    id: hass_time
     ## Define the timezone of the device
     timezone: "${timezone}"
     ## Change sync interval from default 5min to 6 hours
-    update_interval: 360min    
-    ## Publish the time the device was last restarted
-    on_time_sync:
-      then:
-        ## Update last restart time, but only once.
-        - if:
-            condition:
-              lambda: 'return id(device_last_restart).state == "";'
-            then:
-              - text_sensor.template.publish:
-                  id: device_last_restart
-                  state: !lambda 'return id(sntp_time).now().strftime("%a %d %b %Y - %I:%M:%S %p");'
+    update_interval: 360min   
