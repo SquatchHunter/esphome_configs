@@ -8,7 +8,7 @@ substitutions:
   room: ""
   device_description: "AirGradient Air Monitor with OLED Display & LEDs" 
   project_name: "AirGradient.AG One"
-  project_version: "2.2.0" 
+  project_version: "2.2.1" 
   ## Define a domain for this device to use. i.e. iot.home.lan (so device will appear as device.iot.home.lan in DNS/DHCP logs)
   dns_domain: ".local"
   ## Set timezone of the device. Can be entered in unix Country/Area format (i.e. "Australia/Sydney")
@@ -19,7 +19,7 @@ substitutions:
   ## Offset for SenseAir C02 Sensor
   co2_offset: '0'
   ## Time the PMS500x spends idle/off to preserve the laser - https://esphome.io/components/sensor/pmsx003.html
-  pm_update_interval: "2min"
+  pm_update_interval: "300s"
   ## Interval for all non PMSX003 sensors to update (diagnostic sensors not included)
   sensor_update_interval: 60s
 
@@ -49,7 +49,7 @@ ota:
 
 logger:
   baud_rate: 0
-  level: DEBUG
+  level: ERROR
 
 ## Webservers are cool and useful for checking values directly coming out of the device + giving a nice "is it working" sanity check
 ## but the package is also really costly so its better to not use it
@@ -107,48 +107,45 @@ sensor:
       name: "PM 0.3"
       id: pm_0_3um
     update_interval: $pm_update_interval
-
-  ## I have opt'd to disable this sensor and migrate it to HA as it also appears to be rather costly to calculate
-  ## and in my experience was causing the PMSX003 to freeze up from time to time, disabling increased stability.
   
-  # - platform: template
-  #   ## Depends on another sensor providing an ID of pm_2_5 such as a pms5003
-  #   name: "PM 2.5 AQI"
-  #   id: pm_2_5_aqi
-  #   update_interval: 5 min
-  #   unit_of_measurement: "AQI"
-  #   icon: "mdi:air-filter"
-  #   accuracy_decimals: 0
-  #   filters:
-  #     ## Need valid data from PM 2.5 sensor before able to calculate
-  #     - skip_initial: 1  
-  #   lambda: |-
-  #     // https://en.wikipedia.org/wiki/Air_quality_index#Computing_the_AQI
-  #     // Borrowed from https://github.com/kylemanna/sniffer/blob/master/esphome/sniffer_common.yaml
-  #     if (id(pm_2_5).state <= 12.0) {
-  #     // good
-  #     return((50.0 - 0.0) / (12.0 - 0.0) * (id(pm_2_5).state - 0.0) + 0.0);
-  #     } else if (id(pm_2_5).state <= 35.4) {
-  #     // moderate
-  #     return((100.0 - 51.0) / (35.4 - 12.1) * (id(pm_2_5).state - 12.1) + 51.0);
-  #     } else if (id(pm_2_5).state <= 55.4) {
-  #     // usg
-  #     return((150.0 - 101.0) / (55.4 - 35.5) * (id(pm_2_5).state - 35.5) + 101.0);
-  #     } else if (id(pm_2_5).state <= 150.4) {
-  #     // unhealthy
-  #     return((200.0 - 151.0) / (150.4 - 55.5) * (id(pm_2_5).state - 55.5) + 151.0);
-  #     } else if (id(pm_2_5).state <= 250.4) {
-  #     // very unhealthy
-  #     return((300.0 - 201.0) / (250.4 - 150.5) * (id(pm_2_5).state - 150.5) + 201.0);
-  #     } else if (id(pm_2_5).state <= 350.4) {
-  #     // hazardous
-  #     return((400.0 - 301.0) / (350.4 - 250.5) * (id(pm_2_5).state - 250.5) + 301.0);
-  #     } else if (id(pm_2_5).state <= 500.4) {
-  #     // hazardous 2
-  #     return((500.0 - 401.0) / (500.4 - 350.5) * (id(pm_2_5).state - 350.5) + 401.0);
-  #     } else {
-  #     return(500);
-  #     }
+  - platform: template
+    ## Depends on another sensor providing an ID of pm_2_5 such as a pms5003
+    name: "PM 2.5 AQI"
+    id: pm_2_5_aqi
+    update_interval: 5 min
+    unit_of_measurement: "AQI"
+    icon: "mdi:air-filter"
+    accuracy_decimals: 0
+    filters:
+      ## Need valid data from PM 2.5 sensor before able to calculate
+      - skip_initial: 1  
+    lambda: |-
+      // https://en.wikipedia.org/wiki/Air_quality_index#Computing_the_AQI
+      // Borrowed from https://github.com/kylemanna/sniffer/blob/master/esphome/sniffer_common.yaml
+      if (id(pm_2_5).state <= 12.0) {
+      // good
+      return((50.0 - 0.0) / (12.0 - 0.0) * (id(pm_2_5).state - 0.0) + 0.0);
+      } else if (id(pm_2_5).state <= 35.4) {
+      // moderate
+      return((100.0 - 51.0) / (35.4 - 12.1) * (id(pm_2_5).state - 12.1) + 51.0);
+      } else if (id(pm_2_5).state <= 55.4) {
+      // usg
+      return((150.0 - 101.0) / (55.4 - 35.5) * (id(pm_2_5).state - 35.5) + 101.0);
+      } else if (id(pm_2_5).state <= 150.4) {
+      // unhealthy
+      return((200.0 - 151.0) / (150.4 - 55.5) * (id(pm_2_5).state - 55.5) + 151.0);
+      } else if (id(pm_2_5).state <= 250.4) {
+      // very unhealthy
+      return((300.0 - 201.0) / (250.4 - 150.5) * (id(pm_2_5).state - 150.5) + 201.0);
+      } else if (id(pm_2_5).state <= 350.4) {
+      // hazardous
+      return((400.0 - 301.0) / (350.4 - 250.5) * (id(pm_2_5).state - 250.5) + 301.0);
+      } else if (id(pm_2_5).state <= 500.4) {
+      // hazardous 2
+      return((500.0 - 401.0) / (500.4 - 350.5) * (id(pm_2_5).state - 350.5) + 401.0);
+      } else {
+      return(500);
+      }
 
   - platform: senseair
     ## https://esphome.io/components/sensor/senseair.html
