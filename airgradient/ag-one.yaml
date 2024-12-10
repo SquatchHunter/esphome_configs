@@ -8,7 +8,7 @@ substitutions:
   room: ""
   device_description: "AirGradient Air Monitor with OLED Display & LEDs" 
   project_name: "AirGradient.AG One"
-  project_version: "2.2.1" 
+  project_version: "2.4.0" 
   ## Define a domain for this device to use. i.e. iot.home.lan (so device will appear as device.iot.home.lan in DNS/DHCP logs)
   dns_domain: ".local"
   ## Set timezone of the device. Can be entered in unix Country/Area format (i.e. "Australia/Sydney")
@@ -28,7 +28,7 @@ esphome:
   friendly_name: "${friendly_name}"
   area: "${room}"
   name_add_mac_suffix: false
-  min_version: 2024.2.1
+  min_version: 2024.11.0
   project:
     name: "${project_name}"
     version: "${project_version}"
@@ -44,8 +44,10 @@ preferences:
 api:
   encryption: 
     ## EPSHome & HA seem to whinge if there is no encryption.
-    key: {totally_cool_encryption_key}
+    key: !secret api_key
 ota:
+  - platform: esphome
+    password: !secret ota_password
 
 logger:
   baud_rate: 0
@@ -106,19 +108,23 @@ sensor:
     pm_0_3um:
       name: "PM 0.3"
       id: pm_0_3um
+      ## Update the AQI sensor every time we collect a new PMx reading
+      on_value: 
+        then:
+          - component.update: pm_2_5_aqi
     update_interval: $pm_update_interval
   
   - platform: template
     ## Depends on another sensor providing an ID of pm_2_5 such as a pms5003
     name: "PM 2.5 AQI"
     id: pm_2_5_aqi
-    update_interval: 5 min
+    update_interval: never
     unit_of_measurement: "AQI"
     icon: "mdi:air-filter"
     accuracy_decimals: 0
     filters:
       ## Need valid data from PM 2.5 sensor before able to calculate
-      - skip_initial: 1  
+      - skip_initial: 3  
     lambda: |-
       // https://en.wikipedia.org/wiki/Air_quality_index#Computing_the_AQI
       // Borrowed from https://github.com/kylemanna/sniffer/blob/master/esphome/sniffer_common.yaml
@@ -227,17 +233,17 @@ binary_sensor:
       ignore_strapping_warning: true
     on_multi_click:
       ## Short Press
-      # - timing:  
-      #     - ON for at most 1s
-      #     - OFF for at least 0.5s
-      #   then:
-      #     - 
-      ## Long Press
       - timing:  
-          - ON for 1s to 5s
+          - ON for at most 1s
           - OFF for at least 0.5s
         then:
           - button.press: s8_calibrate_button
+      ## Long Press
+      # - timing:  
+      #     - ON for 1s to 5s
+      #     - OFF for at least 0.5s
+      #   then:
+      #     - 
 
 text_sensor:
   - platform: wifi_info
@@ -403,9 +409,9 @@ display:
           it.printf(54, 52, id(open_sans_9), "µg/m³");
           it.line(100,19,100,64);
           it.printf(104,18, id(open_sans_9), "TVOC");
-          it.printf(104,29, id(open_sans_9), "%.0f", id(voc).state);
+          it.printf(104,29, id(open_sans_9), "%.0f", id(tvoc).state;
           it.printf(104,41, id(open_sans_9), "NOx");
-          it.printf(104,52, id(open_sans_9), "%.0f", id(nox).state);
+          it.printf(104,52, id(open_sans_9), "%.0f", id(nox).state;
       - id: boot
         lambda: |-
           it.printf(0, 0, id(open_sans_14), "ID:");
@@ -440,7 +446,7 @@ time:
     ## Define the timezone of the device
     timezone: "${timezone}"
     ## Change sync interval from default 5min to 6 hours
-    update_interval: 360min    
+    update_interval: 24hours
     ## Publish the time the device was last restarted
     on_time_sync:
       then:
