@@ -5,7 +5,7 @@ substitutions:
   room: ""
   device_description: "AirGradient Air Monitor with OLED Display & LEDs" 
   project_name: "AirGradient.AG One"
-  project_version: "2.5.0"
+  project_version: "2.5.1"
   ## Define a domain for this device to use. i.e. iot.home.lan (so device will appear as device.iot.home.lan in DNS/DHCP logs)
   dns_domain: ".local"
   ## Set timezone of the device. Can be entered in unix Country/Area format (i.e. "Australia/Sydney")
@@ -87,22 +87,22 @@ sensor:
     type: PMSX003
     uart_id: pms5003_uart
     pm_2_5:
-      name: "${friendly_name} PM 2.5"
+      name: "PM 2.5"
       id: pm_2_5
       ## Added to report properly to HomeKit
       device_class: pm25
     pm_1_0:
-      name: "${friendly_name} PM 1.0"
+      name: "PM 1.0"
       id: pm_1_0
       ## Added to report properly to HomeKit
       device_class: pm1  
     pm_10_0:
-      name: "${friendly_name} PM 10.0"
+      name: "PM 10.0"
       id: pm_10_0
       ## Added to report properly to HomeKit
       device_class: pm10  
     pm_0_3um:
-      name: "${friendly_name} PM 0.3"
+      name: "PM 0.3"
       id: pm_0_3um
       ## Update the AQI sensor every time we collect a new PMx reading
       on_value: 
@@ -112,7 +112,7 @@ sensor:
   
   - platform: template
     ## Depends on another sensor providing an ID of pm_2_5 such as a pms5003
-    name: "${friendly_name} PM 2.5 AQI"
+    name: "PM 2.5 AQI"
     id: pm_2_5_aqi
     update_interval: never
     unit_of_measurement: "AQI"
@@ -152,7 +152,7 @@ sensor:
   - platform: senseair
     ## https://esphome.io/components/sensor/senseair.html
     co2:
-      name: "${friendly_name} CO2"
+      name: "CO2"
       id: co2
       filters:
         - offset: $co2_offset
@@ -163,10 +163,10 @@ sensor:
   - platform: sht4x
     ## https://esphome.io/components/sensor/sht4x.html
     temperature:
-      name: "${friendly_name} Temperature"
+      name: "Temperature"
       id: temp
     humidity:
-      name: "${friendly_name} Humidity"
+      name: "Humidity"
       id: humidity
     # heater_max_duty: 0.05
     address: 0x44
@@ -175,10 +175,10 @@ sensor:
   - platform: sgp4x
     ## https://esphome.io/components/sensor/sgp4x.html
     voc:
-      name: "${friendly_name} VOC Index"
+      name: "VOC Index"
       id: voc
     nox:
-      name: "${friendly_name} NOx Index"
+      name: "NOx Index"
       id: nox
     ## Remove this block if no temp/humidity sensor present for compensation
     compensation:  
@@ -188,7 +188,7 @@ sensor:
     update_interval: $sensor_update_interval
 
   - platform: wifi_signal
-    name: "${friendly_name} WiFi Signal"
+    name: "WiFi Signal"
     id: wifi_signal_db
     update_interval: 60s
     entity_category: diagnostic
@@ -207,7 +207,7 @@ sensor:
 
   - platform: template
     id: uptime_timestamp
-    name: "${friendly_name} Uptime"
+    name: "Uptime"
     device_class: timestamp
     entity_category: diagnostic
     accuracy_decimals: 0
@@ -221,13 +221,13 @@ sensor:
 binary_sensor:
   ## https://esphome.io/components/binary_sensor/status.html
   - platform: status
-    name: "${friendly_name} Status"
+    name: "Status"
     entity_category: diagnostic
 
   - platform: gpio
     ## Binary sensor to perform action when physical config button is pressed
     ## https://esphome.io/components/binary_sensor/index.html?highlight=on_multi_click
-    name: "${friendly_name} Hardware Button"
+    name: "Hardware Button"
     id: hardware_button
     internal: true
     pin:
@@ -252,20 +252,20 @@ binary_sensor:
 text_sensor:
   - platform: wifi_info
     ip_address:
-      name: "${friendly_name} IP Address"
+      name: "IP Address"
       icon: "mdi:ip"
       entity_category: diagnostic
     ssid:
-      name: "${friendly_name} Connected SSID"
+      name: "Connected SSID"
       icon: "mdi:network"
       entity_category: diagnostic
     mac_address:
-      name: "${friendly_name} Mac Address"
+      name: "Mac Address"
       entity_category: diagnostic
 
   ## Creates a sensor showing when the device was last restarted
   - platform: template
-    name: "${friendly_name} Last Reboot"
+    name: "Last Reboot"
     id: last_reboot
     icon: mdi:clock
     entity_category: diagnostic
@@ -273,7 +273,7 @@ text_sensor:
 button:
   ## https://github.com/esphome/issues/issues/2444
   - platform: template
-    name: S8 Calibration
+    name: "S8 Calibration"
     id: s8_calibrate_button
     on_press:
       then:
@@ -285,7 +285,7 @@ button:
 
   - platform: template
     ## Displays the current ABC interval in the ESPhome logs to verify status
-    name: "${friendly_name} S8 Print Calibration Interval"
+    name: "S8 Print Calibration Interval"
     id: s8_print_calibration
     entity_category: diagnostic
     on_press:
@@ -293,17 +293,17 @@ button:
         - senseair.abc_get_period: senseair_s8
 
   - platform: restart
-    name: "${friendly_name} Restart"
+    name: "Restart"
     entity_category: config
     device_class: restart
     icon: "mdi:restart"
   - platform: factory_reset
-    name: "${friendly_name} Factory Reset"
+    name: "Factory Reset"
     id: Reset
     entity_category: config
     icon: "mdi:restore"
   - platform: safe_mode
-    name: "${friendly_name} Safe Mode"
+    name: "Safe Mode"
     entity_category: config
     on_press:
       logger.log: "Entering Safe Mode..."
@@ -311,7 +311,7 @@ button:
 
 switch:
   - platform: template
-    name: "${friendly_name} S8 Automatic Baseline Correction"
+    name: S8 Automatic Baseline Correction
     id: s8_abc_switch
     icon: "mdi:auto-mode"
     restore_mode: RESTORE_DEFAULT_ON
@@ -325,7 +325,7 @@ switch:
 number:
   - platform: template
     ## https://esphome.io/components/number/template.html
-    name: "${friendly_name} Display Contrast %"
+    name: "Display Contrast %"
     icon: "mdi:contrast-circle"
     id: display_contrast
     min_value: 0
@@ -341,7 +341,7 @@ number:
         lambda: id(oled_display).set_contrast(id(display_contrast).state / 100.0);
 
   - platform: template
-    name: "${friendly_name} LED Brightness %"
+    name: "LED Brightness %"
     icon: "mdi:brightness-percent"
     id: led_brightness
     min_value: 0
@@ -353,7 +353,7 @@ number:
     mode: slider
 
   - platform: template
-    name: "${friendly_name} LED Fade %"
+    name: "LED Fade %"
     icon: "mdi:shimmer"
     id: led_fade
     min_value: 0
@@ -395,13 +395,13 @@ display:
         lambda: |-
           it.printf(0, 0, id(open_sans_14), "ID:");
           it.printf(128, 0, id(open_sans_14), TextAlign::TOP_RIGHT, "%s", get_mac_address().c_str());
-          it.printf(0, 21, id(open_sans_14), "Config Ver: ${project_version}");
-          it.printf(0, 42, id(open_sans_14), "${friendly_name}");
+          it.printf(0, 21, id(open_sans_14), "Config Ver: $project_version");
+          it.printf(0, 42, id(open_sans_14), "$friendly_name");
 
 light:
   ## https://esphome.io/components/light/esp32_rmt_led_strip.html
   - platform: esp32_rmt_led_strip
-    name: "${friendly_name} LED Strip"
+    name: "LED Strip"
     id: led_strip
     rgb_order: GRB
     pin: GPIO10  # Pin 16
