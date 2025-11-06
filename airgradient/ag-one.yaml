@@ -1,6 +1,3 @@
-## Formatting Notice, I have used 2 hashtags/pound signs on all original comments + additional I added, single comments on values that have been disabled in this config.
-## This config is based on MallocArray's ESPHome config for the AG One - https://github.com/MallocArray/airgradient_esphome/blob/main/airgradient-one.yaml
-
 substitutions:
   ## Avoid underscores, since ESPHome uses mDNS, underscores can be funny with mDNS and there is no inbuilt sanitiser.
   name: "ag-one"
@@ -8,7 +5,7 @@ substitutions:
   room: ""
   device_description: "AirGradient Air Monitor with OLED Display & LEDs" 
   project_name: "AirGradient.AG One"
-  project_version: "2.4.0" 
+  project_version: "2.5.0"
   ## Define a domain for this device to use. i.e. iot.home.lan (so device will appear as device.iot.home.lan in DNS/DHCP logs)
   dns_domain: ".local"
   ## Set timezone of the device. Can be entered in unix Country/Area format (i.e. "Australia/Sydney")
@@ -36,9 +33,10 @@ esphome:
 esp32:
   ## https://esphome.io/components/esp32.html
   board: esp32-c3-devkitm-1
+  framework: 
+    type: esp-idf
 
 preferences:
-  ## Malloc doesnt set this and uses the default, we will be increasing the interval to preserve flash
   flash_write_interval: 15min
 
 api:
@@ -53,19 +51,17 @@ logger:
   baud_rate: 0
   level: ERROR
 
-## Webservers are cool and useful for checking values directly coming out of the device + giving a nice "is it working" sanity check
-## but the package is also really costly so its better to not use it
-# web_server:
-#   port: 80
-
 wifi:
-  ## Automatically connect with saved SSID & PASSWORD
+  ## https://esphome.io/components/wifi/
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   fast_connect: "${wifi_fast_connect}"
   domain: "${dns_domain}"
-## Similar to Webservers, we disable the captive_portal stack as it can be quite costly.
-# captive_portal:
+  ## Manual IP Template; Suggested to use when you have a busy wireless network to prevent HA making errors
+  # manual_ip: 
+  #   static_ip: x.x.x.x
+  #   gateway: x.x.x.x
+  #   subnet: 255.255.255.0
 
 uart:
   ## https://esphome.io/components/uart.html#uart
@@ -91,22 +87,22 @@ sensor:
     type: PMSX003
     uart_id: pms5003_uart
     pm_2_5:
-      name: "PM 2.5"
+      name: "${friendly_name} PM 2.5"
       id: pm_2_5
       ## Added to report properly to HomeKit
       device_class: pm25
     pm_1_0:
-      name: "PM 1.0"
+      name: "${friendly_name} PM 1.0"
       id: pm_1_0
       ## Added to report properly to HomeKit
       device_class: pm1  
     pm_10_0:
-      name: "PM 10.0"
+      name: "${friendly_name} PM 10.0"
       id: pm_10_0
       ## Added to report properly to HomeKit
       device_class: pm10  
     pm_0_3um:
-      name: "PM 0.3"
+      name: "${friendly_name} PM 0.3"
       id: pm_0_3um
       ## Update the AQI sensor every time we collect a new PMx reading
       on_value: 
@@ -116,7 +112,7 @@ sensor:
   
   - platform: template
     ## Depends on another sensor providing an ID of pm_2_5 such as a pms5003
-    name: "PM 2.5 AQI"
+    name: "${friendly_name} PM 2.5 AQI"
     id: pm_2_5_aqi
     update_interval: never
     unit_of_measurement: "AQI"
@@ -156,7 +152,7 @@ sensor:
   - platform: senseair
     ## https://esphome.io/components/sensor/senseair.html
     co2:
-      name: "CO2"
+      name: "${friendly_name} CO2"
       id: co2
       filters:
         - offset: $co2_offset
@@ -167,10 +163,10 @@ sensor:
   - platform: sht4x
     ## https://esphome.io/components/sensor/sht4x.html
     temperature:
-      name: "Temperature"
+      name: "${friendly_name} Temperature"
       id: temp
     humidity:
-      name: "Humidity"
+      name: "${friendly_name} Humidity"
       id: humidity
     # heater_max_duty: 0.05
     address: 0x44
@@ -179,10 +175,10 @@ sensor:
   - platform: sgp4x
     ## https://esphome.io/components/sensor/sgp4x.html
     voc:
-      name: "VOC Index"
+      name: "${friendly_name} VOC Index"
       id: voc
     nox:
-      name: "NOx Index"
+      name: "${friendly_name} NOx Index"
       id: nox
     ## Remove this block if no temp/humidity sensor present for compensation
     compensation:  
@@ -192,20 +188,15 @@ sensor:
     update_interval: $sensor_update_interval
 
   - platform: wifi_signal
-    name: "WiFi Signal"
+    name: "${friendly_name} WiFi Signal"
     id: wifi_signal_db
     update_interval: 60s
     entity_category: diagnostic
 
   ## https://esphome.io/components/sensor/uptime.html
   - platform: uptime
-    name: "Uptime Sensor"
-    id: uptime_sensor
-    ## see text_sensor below for human readout
+    id: uptime_sec
     internal: true
-    ## logic to control the display during boot
-    ## this prevents the "[W] component interval took to long" errors I encountered.
-    ## !THIS ONLY WORKS WITH ONE PAGE!
     on_value_range: 
       - above: 30
         then:
@@ -214,16 +205,29 @@ sensor:
         then: 
           - display.page.show: boot
 
+  - platform: template
+    id: uptime_timestamp
+    name: "${friendly_name} Uptime"
+    device_class: timestamp
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      static float timestamp = (
+        id(current_time).utcnow().timestamp - id(uptime_sec).state
+      );
+      return timestamp;
+
 binary_sensor:
   ## https://esphome.io/components/binary_sensor/status.html
   - platform: status
-    name: "Status"
+    name: "${friendly_name} Status"
     entity_category: diagnostic
 
   - platform: gpio
     ## Binary sensor to perform action when physical config button is pressed
     ## https://esphome.io/components/binary_sensor/index.html?highlight=on_multi_click
-    name: "Hardware Button"
+    name: "${friendly_name} Hardware Button"
     id: hardware_button
     internal: true
     pin:
@@ -248,45 +252,20 @@ binary_sensor:
 text_sensor:
   - platform: wifi_info
     ip_address:
-      name: "IP Address"
+      name: "${friendly_name} IP Address"
       icon: "mdi:ip"
       entity_category: diagnostic
     ssid:
-      name: "Connected SSID"
+      name: "${friendly_name} Connected SSID"
       icon: "mdi:network"
       entity_category: diagnostic
     mac_address:
-      name: "Mac Address"
+      name: "${friendly_name} Mac Address"
       entity_category: diagnostic
-
-  ## Creates a sensor of the uptime of the device, in formatted days, hours, minutes and seconds
-  - platform: template
-    name: "Uptime"
-    entity_category: diagnostic
-    lambda: |-
-      int temp = (id(uptime_sensor).state);
-      int days = temp / (24 * 3600);
-      temp = temp % (24 * 3600);
-      int hours = temp / 3600;
-      temp = temp % 3600;
-      int minutes = temp /  60;
-      int seconds = temp % 60;
-      if ( seconds < 30 ) {
-        return { "Starting Up..." };
-      } else if ( days ) {
-        return { (String(days) +"d " + String(hours) +"h " + String(minutes) +"m "+ String(seconds) +"s").c_str() };
-      } else if ( hours ) {
-        return { (String(hours) +"h " + String(minutes) +"m "+ String(seconds) +"s").c_str() };
-      } else if ( minutes ) {
-        return { (String(minutes) +"m "+ String(seconds) +"s").c_str() };
-      } else {
-        return { (String(seconds) +"s").c_str() };
-      }
-    icon: mdi:clock-start
 
   ## Creates a sensor showing when the device was last restarted
   - platform: template
-    name: 'Last Reboot'
+    name: "${friendly_name} Last Reboot"
     id: last_reboot
     icon: mdi:clock
     entity_category: diagnostic
@@ -306,7 +285,7 @@ button:
 
   - platform: template
     ## Displays the current ABC interval in the ESPhome logs to verify status
-    name: S8 Print Calibration Interval
+    name: "${friendly_name} S8 Print Calibration Interval"
     id: s8_print_calibration
     entity_category: diagnostic
     on_press:
@@ -314,25 +293,25 @@ button:
         - senseair.abc_get_period: senseair_s8
 
   - platform: restart
-    name: "Restart"
-    icon: "mdi:restart"
+    name: "${friendly_name} Restart"
     entity_category: config
     device_class: restart
+    icon: "mdi:restart"
   - platform: factory_reset
-    name: "Factory Reset"
-    icon: "mdi:restore"
+    name: "${friendly_name} Factory Reset"
     id: Reset
     entity_category: config
+    icon: "mdi:restore"
   - platform: safe_mode
-    name: "Safe Mode"
-    icon: "mdi:restart-alert"
+    name: "${friendly_name} Safe Mode"
     entity_category: config
     on_press:
       logger.log: "Entering Safe Mode..."
+    icon: "mdi:restart-alert"
 
 switch:
   - platform: template
-    name: S8 Automatic Baseline Correction
+    name: "${friendly_name} S8 Automatic Baseline Correction"
     id: s8_abc_switch
     icon: "mdi:auto-mode"
     restore_mode: RESTORE_DEFAULT_ON
@@ -346,7 +325,7 @@ switch:
 number:
   - platform: template
     ## https://esphome.io/components/number/template.html
-    name: "Display Contrast %"
+    name: "${friendly_name} Display Contrast %"
     icon: "mdi:contrast-circle"
     id: display_contrast
     min_value: 0
@@ -362,7 +341,7 @@ number:
         lambda: id(oled_display).set_contrast(id(display_contrast).state / 100.0);
 
   - platform: template
-    name: "LED Brightness %"
+    name: "${friendly_name} LED Brightness %"
     icon: "mdi:brightness-percent"
     id: led_brightness
     min_value: 0
@@ -374,7 +353,7 @@ number:
     mode: slider
 
   - platform: template
-    name: "LED Fade %"
+    name: "${friendly_name} LED Fade %"
     icon: "mdi:shimmer"
     id: led_fade
     min_value: 0
@@ -409,25 +388,24 @@ display:
           it.printf(54, 52, id(open_sans_9), "µg/m³");
           it.line(100,19,100,64);
           it.printf(104,18, id(open_sans_9), "TVOC");
-          it.printf(104,29, id(open_sans_9), "%.0f", id(tvoc).state;
+          it.printf(104,29, id(open_sans_9), "%.0f", id(voc).state);
           it.printf(104,41, id(open_sans_9), "NOx");
-          it.printf(104,52, id(open_sans_9), "%.0f", id(nox).state;
+          it.printf(104,52, id(open_sans_9), "%.0f", id(nox).state);
       - id: boot
         lambda: |-
           it.printf(0, 0, id(open_sans_14), "ID:");
           it.printf(128, 0, id(open_sans_14), TextAlign::TOP_RIGHT, "%s", get_mac_address().c_str());
-          it.printf(0, 21, id(open_sans_14), "Config Ver: $project_version");
-          it.printf(0, 42, id(open_sans_14), "$friendly_name");
+          it.printf(0, 21, id(open_sans_14), "Config Ver: ${project_version}");
+          it.printf(0, 42, id(open_sans_14), "${friendly_name}");
 
 light:
   ## https://esphome.io/components/light/esp32_rmt_led_strip.html
   - platform: esp32_rmt_led_strip
-    name: "LED Strip"
+    name: "${friendly_name} LED Strip"
     id: led_strip
     rgb_order: GRB
     pin: GPIO10  # Pin 16
     num_leds: 11
-    rmt_channel: 0
     chipset: ws2812
     restore_mode: RESTORE_DEFAULT_OFF
 
@@ -442,14 +420,12 @@ output:
 
 time:
   - platform: homeassistant
-    id: hass_time
-    ## Define the timezone of the device
+    id: current_time
     timezone: "${timezone}"
-    ## Change sync interval from default 5min to 6 hours
-    update_interval: 24hours
-    ## Publish the time the device was last restarted
+    # update_interval: 24hours
     on_time_sync:
       then:
+        - component.update: uptime_timestamp
         - logger.log: "Synchronized System Clock"
         ## Update last restart time, but only once.
         - if:
@@ -458,7 +434,7 @@ time:
             then:
               - text_sensor.template.publish:
                   id: last_reboot
-                  state: !lambda 'return id(hass_time).now().strftime("%d/%m/%y - %H:%M:%S");'
+                  state: !lambda 'return id(current_time).now().strftime("%d/%m/%y - %H:%M:%S");'
               - logger.log: "set 'last_reboot' time"
 
 interval:
